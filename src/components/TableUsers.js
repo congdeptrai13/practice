@@ -5,7 +5,11 @@ import ReactPaginate from 'react-paginate';
 import ModalAddNew from "./ModalAddNew";
 import ModalEditUser from "./ModalEditUser";
 import ModalConfirm from "./ModalConfirm";
-import _ from "lodash";
+import _, { clone, debounce } from "lodash";
+import "./TableUsers.scss"
+import { CSVLink } from "react-csv";
+import Papa from "papaparse"
+import { toast } from "react-toastify";
 const TableUsers = (props) => {
   const [listUsers, setListUsers] = useState([]);
   const [totalUsers, setTotalUsers] = useState(0);
@@ -15,6 +19,10 @@ const TableUsers = (props) => {
   const [dataUserEdit, setDataUserEdit] = useState({})
   const [isShowModalDelete, setIsShowModalDelete] = useState(false);
   const [dataUserDelete, setDataUserDelete] = useState({})
+  const [sortBy, setSortBy] = useState("asc");
+  const [sortField, setSortField] = useState("id");
+  const [keyword, setKeyword] = useState("");
+  const [dataExport, setDataExport] = useState([]);
   const handleClose = () => {
     setIsShowModalAddNew(false);
     setIsShowModalEdit(false);
@@ -61,22 +69,163 @@ const TableUsers = (props) => {
     cloneListUsers = cloneListUsers.filter(item => item.id !== user.id);
     setListUsers(cloneListUsers);
   }
+  const handleSort = (sortBy, sortField) => {
+    setSortBy(sortBy);
+    setSortField(sortField)
+    let cloneListUsers = _.cloneDeep(listUsers);
+    cloneListUsers = _.orderBy(cloneListUsers, [sortField], [sortBy])
+    setListUsers(cloneListUsers)
+  }
+  const handleSearch = debounce((event) => {
+    let term = event.target.value;
+    if (term) {
+      let cloneListUsers = _.cloneDeep(listUsers);
+      cloneListUsers = cloneListUsers.filter(item => item.email.includes(term))
+      console.log(cloneListUsers)
+      setListUsers(cloneListUsers)
+    } else {
+      getUsers(1);
+    }
+  }, 100)
+  const getUsersExport = (event, done) => {
+    let result = [];
+    if (listUsers && listUsers.length > 0) {
+      result.push(["Id", "Email", "First name", "Last name"]);
+      listUsers.map((item, index) => {
+        let arr = [];
+        arr[0] = item.id;
+        arr[1] = item.email;
+        arr[2] = item.first_name;
+        arr[3] = item.last_name;
+        result.push(arr);
+      })
+      setDataExport(result);
+      done();
+    }
+  }
+  const handleImportCSV = (event) => {
+    if (event.target && event.target.files && event.target.files[0]) {
+      let file = event.target.files[0];
+      if (file.type !== "text/csv") {
+        toast.error("only access csv files...");
+        return;
+      }
+      //Parse local csv file
+      Papa.parse(file, {
+        // header: true,
+        complete: function (results) {
+          let rawCSV = results.data;
+          if (rawCSV.length > 0) {
+            if (rawCSV[0] && rawCSV[0].length === 3) {
+              if (rawCSV[0][0] !== "email"
+                || rawCSV[0][0] !== "first_name"
+                || rawCSV[0][0] !== "last_name"
+              ) {
+                toast.error("wrong format header CSV file!")
+              } else {
+                let result = [];
+                rawCSV.map((item, index) => {
+                  if (index > 0 && item.length === 3) {
+                    let obj = {};
+                    obj.email = item[0]
+                    obj.first_name = item[0]
+                    obj.last_name = item[0]
+                    result.push(obj);
+                  }
+                })
+                setListUsers(result);
+
+              }
+            } else {
+              toast.error("wrong format on CSV file!")
+            }
+          } else {
+            toast.error("not found data on CSV file!")
+          }
+        }
+      });
+    }
+
+  }
   return (
     <>
       <div className='my-3 add-new'>
         <span><b>list users:</b></span>
-        <button className='btn btn-success'
-          onClick={() => setIsShowModalAddNew(true)}
-        >Add new user</button>
+        <div className="group-btns">
+          <label htmlFor="test" className="btn btn-warning">
+            <i className="fa-solid fa-file-import"></i> Import
+          </label>
+          <input
+            id="test" type="file" hidden
+            onChange={(event) => handleImportCSV(event)}
+          />
+          <CSVLink
+            data={dataExport}
+            filename={"user.csv"}
+            className="btn btn-primary"
+            asyncOnClick={true}
+            onClick={getUsersExport}
+          ><i className="fa-solid fa-file-arrow-down"></i> Export</CSVLink>
+          <button className='btn btn-success'
+            onClick={() => setIsShowModalAddNew(true)}
+          >
+            <i className="fa-solid fa-circle-plus"></i> Add new
+          </button>
+        </div>
+
+      </div>
+      <div className="col-4 my-3">
+        <input
+          className="form-control"
+          placeholder="search user by email..."
+          // value={keyword}
+          onChange={(event) => handleSearch(event)}
+        />
       </div>
       <Table striped bordered hover>
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Email</th>
-            <th>First name</th>
-            <th>Last name</th>
-            <th>Actions</th>
+            <th>
+              <div className="sort-header">
+                <span>ID</span>
+                <span> <i className="fa-solid fa-arrow-down-long"
+                  onClick={() => handleSort("desc", "id")}
+                ></i>
+                  <i className="fa-solid fa-arrow-up-long"
+                    onClick={() => handleSort("asc", "id")}
+                  ></i>
+                </span>
+              </div>
+            </th>
+            <th >
+              <div className="sort-header">
+                <span>Email</span>
+                <span> <i className="fa-solid fa-arrow-down-long"></i>
+                  <i className="fa-solid fa-arrow-up-long"></i>
+                </span>
+              </div>
+            </th>
+            <th >
+              <div className="sort-header">
+                <span>First name</span>
+                <span> <i className="fa-solid fa-arrow-down-long"
+                  onClick={() => handleSort("desc", "first_name")}
+                ></i>
+                  <i className="fa-solid fa-arrow-up-long"
+                    onClick={() => handleSort("asc", "first_name")}
+                  ></i>
+                </span>
+              </div>
+            </th>
+            <th >
+              <div className="sort-header">
+                <span>Last name</span>
+                <span> <i className="fa-solid fa-arrow-down-long"></i>
+                  <i className="fa-solid fa-arrow-up-long"></i>
+                </span>
+              </div>
+            </th>
+            <th >Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -102,7 +251,7 @@ const TableUsers = (props) => {
             })}
 
         </tbody>
-      </Table>
+      </Table >
       <ReactPaginate
         breakLabel="..."
         nextLabel="next >"
