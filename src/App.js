@@ -4,11 +4,19 @@ import TableUsers from './components/TableUsers';
 import { Container } from 'react-bootstrap';
 
 import { ToastContainer } from 'react-toastify';
-import { useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import Home from './components/Home';
 import { Routes, Route, Link } from "react-router-dom";
-import Login from "./components/Login"
+import Login from "./components/Login";
+import { UserContext } from './context/UserContext';
 function App() {
+  const { user, loginContext } = useContext(UserContext);
+  console.log("check user:", user);
+  useEffect(() => {
+    if (localStorage.getItem("token")) {
+      loginContext(localStorage.getItem("email"), localStorage.getItem("token"))
+    }
+  }, [])
   return (
     <>
       <div className='app-container'>

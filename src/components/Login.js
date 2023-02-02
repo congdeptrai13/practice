@@ -1,21 +1,43 @@
-import { useState } from "react"
+import { useContext, useEffect, useState } from "react"
 import "./Login.scss"
 import { loginApi } from "../services/UserService";
 import { toast } from "react-toastify";
+import { Link, useNavigate } from "react-router-dom";
+import { UserContext } from "../context/UserContext";
 const Login = (props) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isShowPassword, setIsShowPassword] = useState(false)
+  const [loadingAPI, setLoadingAPI] = useState(false);
+  const navigate = useNavigate();
+  const { loginContext } = useContext(UserContext);
+  // useEffect(() => {
+  //   let token = localStorage.getItem("token");
+  //   if (token) {
+  //     navigate("/");
+  //   }
+  // }, [])
   const handleLogin = async () => {
     if (!email || !password) {
       toast.error("email/Password is required!");
       return;
     }
+    setLoadingAPI(true);
     let res = await loginApi(email, password);
     if (res && res.token) {
-      localStorage.setItem("token", res.token)
+      loginContext(email, res.token);
+      navigate("/");
+    } else {
+      //error
+      if (res && res.status === 400) {
+        toast.error(res.data.error);
+      }
     }
-    console.log("check login", res);
+    setLoadingAPI(false);
+
+  }
+  const handleGoBack = () => {
+    navigate("/")
   }
   return (
 
@@ -23,7 +45,7 @@ const Login = (props) => {
       <div className="title">
         Log in
       </div>
-      <div className="text">Email or usename</div>
+      <div className="text">Email or usename(eve.holt@reqres.in)</div>
       <input
         type="text"
         placeholder="Email or username"
@@ -44,14 +66,17 @@ const Login = (props) => {
       </div>
 
       <button className={email && password ? "active" : ""}
-        disabled={email && password ? false : true}
+        disabled={email && password || loadingAPI ? false : true}
         onClick={() => handleLogin()}
-      >Log in</button>
+      >
+        {loadingAPI && <i className="fa-solid fa-sync fa-spin"></i>}
+        &nbsp;Log in</button>
       <div className="back">
-        <i className="fa-solid fa-eye"></i> Go back
+        <i className="fa-solid fa-eye"></i>
+        <span onClick={() => handleGoBack()}>&nbsp;Go back</span>
       </div >
     </div >
   )
 
 }
-export default Login
+export default Login;
